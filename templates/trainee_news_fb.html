@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+    <meta charset="UTF-8">
+    <title>Trainee news feedback</title>
+</head>
+<body>
+<main class = "col-12 col-md-9 col-xl-8 py-md-3 pl-md-5 bd-content" role = "main">
+<table class="table table-bordered">
+  <tbody>
+    <tr>
+      <th scope="row" class="table-primary">上記判定の正否</th>
+      <td>
+           <div class="form-group">
+                <select class="form-control" id="seihi">
+                  <option></option>
+                    <option>〇</option>
+                  <option>×</option>
+                </select>
+           </div>
+      </td>
+    </tr>
+    <tr>
+      <th scope="row" class="table-primary">対応の有無</th>
+      <td>
+          <div class="form-group">
+                <select class="form-control" id="umu">
+                  <option></option>
+                    <option>有り</option>
+                  <option>無し</option>
+                </select>
+           </div>
+      <div class="input-group mb-3">
+  <div class="input-group-prepend">
+    <span class="input-group-text" id="basic-addon1">有りの場合</span>
+  </div>
+  <input type="text" class="form-control" placeholder="対応内容" aria-label="Username" aria-describedby="basic-addon1">
+</div></td>
+    </tr>
+    <tr>
+      <th scope="row" class="table-primary">結果</th>
+      <td><div class="form-group">
+            <textarea class="form-control" id="exampleFormControlTextarea1" rows="3" placeholder="受講者の反応や変化を自由に記載"></textarea>
+          </div>
+      </td>
+    </tr>
+  </tbody>
+</table>
+    <button type="button" class="btn btn-secondary btn-lg btn-block" id="send">送信</button>
+</main>
+<script src="https://code.jquery.com/jquery-3.3.1.js"></script>
+<script>
+    $('#send').on('click',function(){
+    var data1 = $('#seihi').val();
+    var data2 = $('#umu').val();
+    var data3 = $('input').val();
+    var data4 = $('textarea').val();
+    console.log(data1,data2,data3,data4);
+    });
+</script>
+
+</body>
+</html>
