@@ -17,6 +17,10 @@ import unicodedata
 import MeCab
 from collections import Counter
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
+import joblib
+from sklearn.ensemble import RandomForestClassifier
+import schedule
+import time
 
 ###########################################
 #案件情報　毎回作成
@@ -174,3 +178,250 @@ def tfidf():
     X = vectorizert.fit_transform(train["text_tokenized_normalized_number"])
     return X
 X=tfidf()
+
+#＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝
+#６_教師データ
+def labeled_data():
+    with open('sentence_name_1356.csv',encoding='utf-8') as file:
+        dataset=pd.read_table(file, delimiter=',',na_filter=False)
+
+    text_normalized = []
+    for text in dataset.sentence_list:
+        text_normalized.append(unicodedata.normalize('NFKC', text))
+    dataset['text_normalized']=text_normalized
+
+    #形態素解析
+    mecab = MeCab.Tagger("-O wakati")
+    text_tokenized = []
+    for text in dataset['text_normalized']:
+        text_tokenized.append(mecab.parse(text))
+    dataset['text_tokenized']=text_tokenized
+
+    #数字の統一置き換え
+    def normalize_number(text):
+        normalize_number_text=[]
+        for n in text:
+            replaced_text = re.sub(r'\d+', '0', n)
+            normalize_number_text.append(replaced_text)
+        return normalize_number_text
+
+    text_tokenized_normalized_number = normalize_number(text_tokenized)
+    dataset['text_tokenized_normalized_number']=text_tokenized_normalized_number
+    labeled=dataset.drop('text_normalized',axis=1)
+    labeled=labeled.drop('sentence_list',axis=1)
+    labeled=labeled.drop('text_tokenized',axis=1)
+    return labeled
+labeled=labeled_data()
+
+def labeled_vec():
+    #単語行列の作成
+    X2 = vectorizer.fit_transform(labeled["text_tokenized_normalized_number"])
+
+    #TFIDF計算
+    vectorizert = TfidfVectorizer(token_pattern=r"(?u)\b\w+\b")
+    X = vectorizert.fit_transform(labeled["text_tokenized_normalized_number"])
+    return X
+X=labeled_vec()
+
+#6-2_単語文章行列を学習済みデータ未知データでそれぞれ生成
+def transform_vec():
+    X_test2 = vectorizer.transform(train["text_tokenized_normalized_number"])
+    return X_test2
+X_test2=transform_vec()
+
+
+#＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝
+#７_学習・予測
+#８_予測データ表示
+#8-1_ゾーン小さい順に並べ替え
+def predict_nlp_by_zone():
+    labeled_y = np.array(labeled['zone'])
+
+    #教師データで学習
+    rfc = RandomForestClassifier(random_state=1234)
+    rfc.fit(X, labeled_y)
+
+    #### モデル読み込み
+    rfc_restored = joblib.load("negacheck_fit_1356_2018.pkl.gz")
+
+    y_pred_on_test2=rfc_restored.predict(X_test2)
+
+    test2_ypred= pd.DataFrame(y_pred_on_test2,dtype=int)#arrayからpdに変換
+    test2_ypred["No."]=sentense_data['No.']#dayを結合
+    test2_ypred["Day"]=sentense_data['day']#dayを結合
+    test2_ypred["Name"]=sentense_data['name']#dayを結合
+    test2_ypred["sentence"]=sentense_data['sentence_list']#sentenceを結合
+    test2_ypred=test2_ypred.rename(columns={0:'nega_predict'})
+
+    day_max_nega=test2_ypred.groupby(['No.','Day']).max()
+    day_max_nega=day_max_nega.sort_index()
+
+    predict_data_yesterday=pd.merge(yesterday,day_max_nega,on=['Name','Day'])
+    predict_data_yesterday['zone'] = predict_data_yesterday['zone'].astype(int)
+
+    drop_col = ['Active','maemuki','sossenn','control','challenge','jujitu','dekita','sentence_x','sentence_len']
+    predict_data_yesterday=predict_data_yesterday.drop(drop_col,axis=1)
+
+    predict_data_yesterday=predict_data_yesterday.sort_values(by=['zone','No.'])#ゾーン小さい順に並べ替え
+    return predict_data_yesterday
+
+#8-2_人別に並べ替え
+def predict_nlp_by_trainee():
+    labeled_y = np.array(labeled['zone'])
+
+    #教師データで学習
+    rfc = RandomForestClassifier(random_state=1234)
+    rfc.fit(X, labeled_y)
+
+    #### モデル読み込み
+    rfc_restored = joblib.load("negacheck_fit_1356_2018.pkl.gz")
+
+    y_pred_on_test2=rfc_restored.predict(X_test2)
+
+    test2_ypred= pd.DataFrame(y_pred_on_test2,dtype=int)#arrayからpdに変換
+    test2_ypred["No."]=sentense_data['No.']#dayを結合
+    test2_ypred["Day"]=sentense_data['day']#dayを結合
+    test2_ypred["Name"]=sentense_data['name']#dayを結合
+    test2_ypred["sentence"]=sentense_data['sentence_list']#sentenceを結合
+    test2_ypred=test2_ypred.rename(columns={0:'nega_predict'})
+
+    day_max_nega=test2_ypred.groupby(['No.','Day']).max()
+    day_max_nega=day_max_nega.sort_index()
+
+    predict_data_yesterday=pd.merge(yesterday,day_max_nega,on=['Name','Day'])
+    predict_data_yesterday['zone'] = predict_data_yesterday['zone'].astype(int)
+
+    drop_col = ['Active','maemuki','sossenn','control','challenge','jujitu','dekita','sentence_x','sentence_len']
+    predict_data_yesterday=predict_data_yesterday.drop(drop_col,axis=1)
+
+    predict_data_yesterday=predict_data_yesterday.sort_values(by=['No.','Day'])#人別に並べ替え
+    return predict_data_yesterday
+
+predict_data_yesterday=predict_nlp_by_zone()
+
+
+def insert_msg():
+    nega2all_msg = f"ネガティブな表現あり。"
+    nega2_msg = f"ネガティブな表現あり。"
+    nega2_ifnecessary = f"ネガティブな表現あり。"
+    zone12nonnega_msg = f"ネガティブな表現はみられませんでしたが、成長が停滞している状態。"
+    zone3nonnega_msg = f"ネガティブな表現はみられませんでしたが、成長が停滞している可能性。"
+    zone4nonnega_msg = f"順調です。"
+
+    zone1_msg = "アパシーゾーン（無気力）。即時サポートを推奨。"
+    zone2_msg = "パニックゾーンの可能性。即時サポートを推奨。"
+    zone3_msg = "コンフォートゾーンの可能性。"
+    zone4_msg = "順調です（スクワットゾーン）。"
+    zone5_msg = "順調です。"
+    distortion_msg = "ゾーン判定不可。行動と受講者認識にズレあり。"
+    emptyPRD_msg = "Active度の記入をお願いします。"
+    emptyTRA_msg = "Dailyアンケート未回答です。"
+    bar = "＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝"
+
+    # アパシーゾーンかつコメントネガあり/なし
+    predict_data_yesterday.loc[predict_data_yesterday['zone'] == 1, 'zone_msg'] = zone1_msg
+    predict_data_yesterday.loc[
+        (predict_data_yesterday['zone'] == 1) & (predict_data_yesterday['nega_predict'] > 1), 'nega_msg'] = nega2all_msg
+    predict_data_yesterday.loc[(predict_data_yesterday['zone'] == 1) & (
+                predict_data_yesterday['nega_predict'] < 2), 'nega_msg'] = zone12nonnega_msg
+    # パニックゾーンかつコメントネガあり・なし
+    predict_data_yesterday.loc[predict_data_yesterday['zone'] == 2, 'zone_msg'] = zone2_msg
+    predict_data_yesterday.loc[
+        (predict_data_yesterday['zone'] == 2) & (predict_data_yesterday['nega_predict'] > 1), 'nega_msg'] = nega2all_msg
+    predict_data_yesterday.loc[(predict_data_yesterday['zone'] == 2) & (
+                predict_data_yesterday['nega_predict'] < 2), 'nega_msg'] = zone12nonnega_msg
+    # コンフォートゾーンかつコメントネガあり・なし
+    predict_data_yesterday.loc[predict_data_yesterday['zone'] == 3, 'zone_msg'] = zone3_msg
+    predict_data_yesterday.loc[
+        (predict_data_yesterday['zone'] == 3) & (predict_data_yesterday['nega_predict'] > 1), 'nega_msg'] = nega2all_msg
+    predict_data_yesterday.loc[(predict_data_yesterday['zone'] == 3) & (
+                predict_data_yesterday['nega_predict'] < 2), 'nega_msg'] = zone3nonnega_msg
+    # スクワットゾーンかつコメントネガあり・なし
+    predict_data_yesterday.loc[predict_data_yesterday['zone'] == 4, 'zone_msg'] = zone4_msg
+    predict_data_yesterday.loc[(predict_data_yesterday['zone'] == 4) & (
+                predict_data_yesterday['nega_predict'] > 1), 'nega_msg'] = nega2_ifnecessary
+    predict_data_yesterday.loc[(predict_data_yesterday['zone'] == 4) & (
+                predict_data_yesterday['nega_predict'] < 2), 'nega_msg'] = zone4nonnega_msg
+    # パフォーマンスゾーン以上かつコメントネガあり・なし
+    predict_data_yesterday.loc[predict_data_yesterday['zone'] > 4, 'zone_msg'] = zone5_msg
+    predict_data_yesterday.loc[(predict_data_yesterday['zone'] > 4) & (
+                predict_data_yesterday['nega_predict'] > 1), 'nega_msg'] = nega2_ifnecessary
+    predict_data_yesterday.loc[(predict_data_yesterday['zone'] > 4) & (
+                predict_data_yesterday['nega_predict'] < 2), 'nega_msg'] = zone4nonnega_msg
+    # ちぐはぐ、かつコメントネガあり
+    predict_data_yesterday.loc[predict_data_yesterday['zone'] == 0, 'zone_msg'] = distortion_msg
+    predict_data_yesterday.loc[(predict_data_yesterday['zone'] == 0) & (
+                predict_data_yesterday['nega_predict'] > 1), 'nega_msg'] = nega2_ifnecessary
+    predict_data_yesterday.loc[(predict_data_yesterday['zone'] == 0) & (
+                predict_data_yesterday['nega_predict'] < 2), 'nega_msg'] = zone4nonnega_msg
+    # PRD未記入、かつコメントネガあり
+    predict_data_yesterday.loc[predict_data_yesterday['zone'] == -1, 'zone_msg'] = emptyPRD_msg
+    predict_data_yesterday.loc[(predict_data_yesterday['zone'] == -1) & (
+                predict_data_yesterday['nega_predict'] > 1), 'nega_msg'] = nega2_ifnecessary
+    predict_data_yesterday.loc[(predict_data_yesterday['zone'] == 1) & (
+                predict_data_yesterday['nega_predict'] < 2), 'nega_msg'] = zone4nonnega_msg
+    # 受講者未回答
+    predict_data_yesterday.loc[predict_data_yesterday['zone'] == -2, 'zone_msg'] = emptyTRA_msg
+
+    # 表示用に、列を並べ替え
+    PRDmsg = predict_data_yesterday[['No.', 'Name', 'Day', 'zone', 'zone_msg', 'nega_msg', 'comment']]
+    PRDmsg = PRDmsg.rename(columns={'Day_x': 'Day', 'zone_msg': '成長ゾーン', 'nega_msg': 'Dailyアンケートコメント判定',
+                                    'comment': 'Dailyアンケートコメント引用'})
+    pd.options.display.max_colwidth = 500  # 文章が途中で切れないようにするための設定
+    PRDmsg = PRDmsg.fillna('No Data')
+    return PRDmsg
+PRDmsg = insert_msg()
+
+
+def mail_msg():
+    mail_head = f"<p>{company}_{batch}_講師の皆様</p>\
+    <p>おはようございます。昨日の受講者の状態をお伝えします。</p><p>Dailyアンケート:" + DR_URL + "</p>"
+    mail_end = "<p></p>以上"
+    html_sheet = PRDmsg.to_html()
+    html = mail_head + html_sheet + mail_end
+    return html
+html = mail_msg()
+
+
+def gmail_send():
+    from email.utils import make_msgid
+    from email import message
+    import smtplib
+
+    smtp_host = 'smtp.gmail.com'
+    smtp_port = 587
+    from_email = ''
+    username = ''  # Gmailのアドレス
+    password = ''  # Gmailのパスワード
+
+    # メールの内容を作成
+    msg = message.EmailMessage()
+    msg.set_content(html)  # メールの本文
+    yesterday = PRDmsg['Day'][1]
+    msg['Subject'] = f"【{yesterday}】{company}_{batch}Trainee news"  # 件名
+    msg['From'] = from_email  # メール送信元
+    msg['To'] = to_email  # メール送信先
+    msg['Cc'] = cc_email
+
+    asparagus_cid = make_msgid()
+    msg.add_alternative(html.format(asparagus_cid=asparagus_cid[1:-1]), subtype='html')
+
+    # メールサーバーへアクセス
+    server = smtplib.SMTP(smtp_host, smtp_port)
+    server.ehlo()
+    server.starttls()
+    server.ehlo()
+    server.login(username, password)
+    # server.send_message(msg)
+    toaddrs = [to_email] + [cc_email]
+    server.sendmail(from_email, toaddrs, msg.as_string())
+    server.quit()
+
+
+#送信予約する場合
+def notice_PRD():
+    schedule.every().day.at("10:00").do(gmail_send)
+    while True:
+        schedule.run_pending()
+        time.sleep(1)
+notice_PRD()
