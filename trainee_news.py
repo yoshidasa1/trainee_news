@@ -1,4 +1,6 @@
 from flask import Flask, render_template
+import nlp
+
 app = Flask(__name__)
 
 
