@@ -3,7 +3,8 @@
 # pycharmでのパッケージのインストールが、一部、うまく検索で見つけられなかったものがありました。pickleやreなど→pip
 # 機械学習前の前処理の途中で、書きかけですが、コードの書き方や関数の動かし方など、アドバイスいただければ嬉しいです
 
-
+# !pip install pickle
+import pickle
 import re
 import time
 import unicodedata
@@ -59,23 +60,13 @@ def select_yesterday():
     recent = kako['Day']
     yesterday = data[data['Day'] == recent]
     yesterday = yesterday.reset_index(drop=True)
-    return yesterday
-
-# nlp.py:56: SettingWithCopyWarning:
-# A value is trying to be set on a copy of a slice from a DataFrame
-
-
-# 3_　文章分割
-def split_sent():
     # 3-1_改行コードを消す
     box = []
-    yesterday = select_yesterday()
     for k in yesterday["comment"]:
         split_sentence = re.sub(r"\s+", "", k)
         box.append(split_sentence)
     comment2 = pd.DataFrame(box, columns=['comment'])
     comment = comment2['comment']
-
     # 3-2_1文ずつに区切る処理
     sentence = []
     for i in range(len(comment)):
@@ -83,29 +74,37 @@ def split_sent():
         sentence.append([x for x in s if x])
     yesterday['sentence'] = sentence
     yesterday['sentence_len'] = yesterday['sentence'].apply(len)
+    return yesterday
+print(select_yesterday())
+# nlp.py:56: SettingWithCopyWarning:
+# A value is trying to be set on a copy of a slice from a DataFrame
 
+#
+# 3_　文章分割
+def split_sent():
+    yesterday = select_yesterday()
     # 3-3_データ結合
     #リストの内包表記
-    #https: // docs.python.org / ja / 3 / tutorial / datastructures.html  # list-comprehensions
-    trainee_number_list = [[yesterday['No.'][i]] * yesterday['sentence_len'][i] for i in yesterday]
-    # trainee_number_list = []  # No.リストの作成
-    # for i in range(len(yesterday)):
-    #     tmp = [yesterday['No.'][i]] * yesterday['sentence_len'][i]
-    #     trainee_number_list.extend(tmp)
-    day_list = [[yesterday['Day'][i]] * yesterday['sentence_len'][i] for i in yesterday]
-    # day_list = []  # DAYリストの作成
-    # for i in range(len(yesterday)):
-    #     tmp = [yesterday['Day'][i]] * yesterday['sentence_len'][i]
-    #     day_list.extend(tmp)
-    name_list = [[yesterday['Name'][i]] * yesterday['sentence_len'][i] for i in yesterday]
-    # name_list = []  # Nameリストの作成
-    # for i in range(len(yesterday)):
-    #     tmp = [yesterday['Name'][i]] * yesterday['sentence_len'][i]
-    #     name_list.extend(tmp)
-    sentence_list = [yesterday['sentence'][i] for i in yesterday]
-    # sentence_list = []  # 文リストの作成
-    # for i in range(len(yesterday)):
-    #     sentence_list.extend(yesterday['sentence'][i])
+    #https: // docs.python.org / ja / 3 / tutorial / datastructures.html#list-comprehensions
+    trainee_number_list = [[yesterday['No.'][i]] * yesterday['sentence_len'][i] for i in range(len(yesterday))]
+    trainee_number_list = []  # No.リストの作成
+    for i in range(len(yesterday)):
+        tmp = [yesterday['No.'][i]] * yesterday['sentence_len'][i]
+        trainee_number_list.extend(tmp)
+    # day_list = [[yesterday['Day'][i]] * yesterday['sentence_len'][i] for i in range(len(yesterday))]
+    day_list = []  # DAYリストの作成
+    for i in range(len(yesterday)):
+        tmp = [yesterday['Day'][i]] * yesterday['sentence_len'][i]
+        day_list.extend(tmp)
+    # name_list = [[yesterday['Name'][i]] * yesterday['sentence_len'][i] for i in range(len(yesterday))]
+    name_list = []  # Nameリストの作成
+    for i in range(len(yesterday)):
+        tmp = [yesterday['Name'][i]] * yesterday['sentence_len'][i]
+        name_list.extend(tmp)
+    # sentence_list = [yesterday['sentence'][i] for i in range(len(yesterday))]
+    sentence_list = []  # 文リストの作成
+    for i in range(len(yesterday)):
+        sentence_list.extend(yesterday['sentence'][i])
 
     sentence_data = pd.DataFrame({
         'No.': trainee_number_list,
@@ -117,6 +116,7 @@ def split_sent():
     bool_list = sentence_data["sentence_list"] == ""
     sentense_data = sentence_data[~bool_list]
     return sentense_data
+# print(split_sent())
 
 
 # ３_単語分割
@@ -239,8 +239,8 @@ def predict_nlp_by_zone():
     rfc = RandomForestClassifier(random_state=1234)
     rfc.fit(X, labeled_y)
     #### モデル読み込み
-    rfc_restored = joblib.load("negacheck_fit_1356_2018.pkl.gz")
-    y_pred_on_test2 = rfc_restored.predict(X_test2)
+    # rfc_restored = joblib.load("model/negacheck_fit_1356_2018.pkl.gz")
+    y_pred_on_test2 = rfc.predict(X_test2)
     test2_ypred = pd.DataFrame(y_pred_on_test2, dtype=int)  # arrayからpdに変換
     test2_ypred["No."] = sentense_data['No.']  # No.を結合
     test2_ypred["Day"] = sentense_data['day']  # dayを結合
@@ -254,8 +254,7 @@ def predict_nlp_by_zone():
     predict_data_yesterday = pd.merge(yesterday, day_max_nega, on=['Name', 'Day'])
     predict_data_yesterday['zone'] = predict_data_yesterday['zone'].astype(int)
 
-    drop_col = ['Active', 'maemuki', 'sossenn', 'control', 'challenge', 'jujitu', 'dekita', 'sentence_x',
-                'sentence_len']
+    drop_col = ['Active', 'maemuki', 'sossenn', 'control', 'challenge', 'jujitu', 'dekita', 'sentence_x', 'sentence_len']
     predict_data_yesterday = predict_data_yesterday.drop(drop_col, axis=1)
 
     predict_data_yesterday = predict_data_yesterday.sort_values(by=['zone', 'No.'])  # ゾーン小さい順に並べ替え
@@ -271,11 +270,9 @@ def predict_nlp_by_trainee():
     # 教師データで学習
     rfc = RandomForestClassifier(random_state=1234)
     rfc.fit(X, labeled_y)
-
     #### モデル読み込み
-    rfc_restored = joblib.load("negacheck_fit_1356_2018.pkl.gz")
-
-    y_pred_on_test2 = rfc_restored.predict(X_test2)
+    # rfc_restored = joblib.load("model/negacheck_fit_1356_2018.pkl.gz")
+    y_pred_on_test2 = rfc.predict(X_test2)
 
     test2_ypred = pd.DataFrame(y_pred_on_test2, dtype=int)  # arrayからpdに変換
     test2_ypred["No."] = sentense_data['No.']  # dayを結合
@@ -321,58 +318,59 @@ def insert_msg():
 
     # アパシーゾーンかつコメントネガあり/なし
     def zone_judge(zone=None, zone_msg=None):
-        return predict_data_yesterday.loc[zone, 'zone_msg'] = zone_msg
+        predict_data_yesterday.loc[zone, 'zone_msg'] = zone_msg
     def nega_judge(zone=None, nega=None, nega_msg=None):
-        return predict_data_yesterday.loc[zone & nega, 'nega_msg'] = nega_msg
+        predict_data_yesterday.loc[zone & nega, 'nega_msg'] = nega_msg
 
     zone_judge(zone = predict_data_yesterday['zone'] == 1, zone_msg = zone1_msg)
     nega_judge(
         zone=(predict_data_yesterday['zone'] == 1), nega=(predict_data_yesterday['nega_predict'] > 1), nega_msg = nega2all_msg)
-
-    predict_data_yesterday.loc[predict_data_yesterday['zone'] == 1, 'zone_msg'] = zone1_msg
-    predict_data_yesterday.loc[
-        (predict_data_yesterday['zone'] == 1) & (predict_data_yesterday['nega_predict'] > 1), 'nega_msg'] = nega2all_msg
-    predict_data_yesterday.loc[(predict_data_yesterday['zone'] == 1) & (
-            predict_data_yesterday['nega_predict'] < 2), 'nega_msg'] = zone12nonnega_msg
-    # パニックゾーンかつコメントネガあり・なし
-    predict_data_yesterday.loc[predict_data_yesterday['zone'] == 2, 'zone_msg'] = zone2_msg
-    predict_data_yesterday.loc[
-        (predict_data_yesterday['zone'] == 2) & (predict_data_yesterday['nega_predict'] > 1), 'nega_msg'] = nega2all_msg
-    predict_data_yesterday.loc[(predict_data_yesterday['zone'] == 2) & (
-            predict_data_yesterday['nega_predict'] < 2), 'nega_msg'] = zone12nonnega_msg
-    # コンフォートゾーンかつコメントネガあり・なし
-    predict_data_yesterday.loc[predict_data_yesterday['zone'] == 3, 'zone_msg'] = zone3_msg
-    predict_data_yesterday.loc[
-        (predict_data_yesterday['zone'] == 3) & (predict_data_yesterday['nega_predict'] > 1), 'nega_msg'] = nega2all_msg
-    predict_data_yesterday.loc[(predict_data_yesterday['zone'] == 3) & (
-            predict_data_yesterday['nega_predict'] < 2), 'nega_msg'] = zone3nonnega_msg
-    # スクワットゾーンかつコメントネガあり・なし
-    predict_data_yesterday.loc[predict_data_yesterday['zone'] == 4, 'zone_msg'] = zone4_msg
-    predict_data_yesterday.loc[(predict_data_yesterday['zone'] == 4) & (
-            predict_data_yesterday['nega_predict'] > 1), 'nega_msg'] = nega2_ifnecessary
-    predict_data_yesterday.loc[(predict_data_yesterday['zone'] == 4) & (
-            predict_data_yesterday['nega_predict'] < 2), 'nega_msg'] = zone4nonnega_msg
-    # パフォーマンスゾーン以上かつコメントネガあり・なし
-    predict_data_yesterday.loc[predict_data_yesterday['zone'] > 4, 'zone_msg'] = zone5_msg
-    predict_data_yesterday.loc[(predict_data_yesterday['zone'] > 4) & (
-            predict_data_yesterday['nega_predict'] > 1), 'nega_msg'] = nega2_ifnecessary
-    predict_data_yesterday.loc[(predict_data_yesterday['zone'] > 4) & (
-            predict_data_yesterday['nega_predict'] < 2), 'nega_msg'] = zone4nonnega_msg
-    # ちぐはぐ、かつコメントネガあり
-    predict_data_yesterday.loc[predict_data_yesterday['zone'] == 0, 'zone_msg'] = distortion_msg
-    predict_data_yesterday.loc[(predict_data_yesterday['zone'] == 0) & (
-            predict_data_yesterday['nega_predict'] > 1), 'nega_msg'] = nega2_ifnecessary
-    predict_data_yesterday.loc[(predict_data_yesterday['zone'] == 0) & (
-            predict_data_yesterday['nega_predict'] < 2), 'nega_msg'] = zone4nonnega_msg
-    # PRD未記入、かつコメントネガあり
-    predict_data_yesterday.loc[predict_data_yesterday['zone'] == -1, 'zone_msg'] = emptyPRD_msg
-    predict_data_yesterday.loc[(predict_data_yesterday['zone'] == -1) & (
-            predict_data_yesterday['nega_predict'] > 1), 'nega_msg'] = nega2_ifnecessary
-    predict_data_yesterday.loc[(predict_data_yesterday['zone'] == 1) & (
-            predict_data_yesterday['nega_predict'] < 2), 'nega_msg'] = zone4nonnega_msg
-    # 受講者未回答
-    predict_data_yesterday.loc[predict_data_yesterday['zone'] == -2, 'zone_msg'] = emptyTRA_msg
-
+    nega_judge(
+        zone=(predict_data_yesterday['zone'] == 1), nega=(predict_data_yesterday['nega_predict'] < 2), nega_msg = zone12nonnega_msg)
+#     predict_data_yesterday.loc[predict_data_yesterday['zone'] == 1, 'zone_msg'] = zone1_msg
+#     predict_data_yesterday.loc[
+#         (predict_data_yesterday['zone'] == 1) & (predict_data_yesterday['nega_predict'] > 1), 'nega_msg'] = nega2all_msg
+#     predict_data_yesterday.loc[(predict_data_yesterday['zone'] == 1) & (
+#             predict_data_yesterday['nega_predict'] < 2), 'nega_msg'] = zone12nonnega_msg
+#     # パニックゾーンかつコメントネガあり・なし
+#     predict_data_yesterday.loc[predict_data_yesterday['zone'] == 2, 'zone_msg'] = zone2_msg
+#     predict_data_yesterday.loc[
+#         (predict_data_yesterday['zone'] == 2) & (predict_data_yesterday['nega_predict'] > 1), 'nega_msg'] = nega2all_msg
+#     predict_data_yesterday.loc[(predict_data_yesterday['zone'] == 2) & (
+#             predict_data_yesterday['nega_predict'] < 2), 'nega_msg'] = zone12nonnega_msg
+#     # コンフォートゾーンかつコメントネガあり・なし
+#     predict_data_yesterday.loc[predict_data_yesterday['zone'] == 3, 'zone_msg'] = zone3_msg
+#     predict_data_yesterday.loc[
+#         (predict_data_yesterday['zone'] == 3) & (predict_data_yesterday['nega_predict'] > 1), 'nega_msg'] = nega2all_msg
+#     predict_data_yesterday.loc[(predict_data_yesterday['zone'] == 3) & (
+#             predict_data_yesterday['nega_predict'] < 2), 'nega_msg'] = zone3nonnega_msg
+#     # スクワットゾーンかつコメントネガあり・なし
+#     predict_data_yesterday.loc[predict_data_yesterday['zone'] == 4, 'zone_msg'] = zone4_msg
+#     predict_data_yesterday.loc[(predict_data_yesterday['zone'] == 4) & (
+#             predict_data_yesterday['nega_predict'] > 1), 'nega_msg'] = nega2_ifnecessary
+#     predict_data_yesterday.loc[(predict_data_yesterday['zone'] == 4) & (
+#             predict_data_yesterday['nega_predict'] < 2), 'nega_msg'] = zone4nonnega_msg
+#     # パフォーマンスゾーン以上かつコメントネガあり・なし
+#     predict_data_yesterday.loc[predict_data_yesterday['zone'] > 4, 'zone_msg'] = zone5_msg
+#     predict_data_yesterday.loc[(predict_data_yesterday['zone'] > 4) & (
+#             predict_data_yesterday['nega_predict'] > 1), 'nega_msg'] = nega2_ifnecessary
+#     predict_data_yesterday.loc[(predict_data_yesterday['zone'] > 4) & (
+#             predict_data_yesterday['nega_predict'] < 2), 'nega_msg'] = zone4nonnega_msg
+#     # ちぐはぐ、かつコメントネガあり
+#     predict_data_yesterday.loc[predict_data_yesterday['zone'] == 0, 'zone_msg'] = distortion_msg
+#     predict_data_yesterday.loc[(predict_data_yesterday['zone'] == 0) & (
+#             predict_data_yesterday['nega_predict'] > 1), 'nega_msg'] = nega2_ifnecessary
+#     predict_data_yesterday.loc[(predict_data_yesterday['zone'] == 0) & (
+#             predict_data_yesterday['nega_predict'] < 2), 'nega_msg'] = zone4nonnega_msg
+#     # PRD未記入、かつコメントネガあり
+#     predict_data_yesterday.loc[predict_data_yesterday['zone'] == -1, 'zone_msg'] = emptyPRD_msg
+#     predict_data_yesterday.loc[(predict_data_yesterday['zone'] == -1) & (
+#             predict_data_yesterday['nega_predict'] > 1), 'nega_msg'] = nega2_ifnecessary
+#     predict_data_yesterday.loc[(predict_data_yesterday['zone'] == 1) & (
+#             predict_data_yesterday['nega_predict'] < 2), 'nega_msg'] = zone4nonnega_msg
+#     # 受講者未回答
+#     predict_data_yesterday.loc[predict_data_yesterday['zone'] == -2, 'zone_msg'] = emptyTRA_msg
+#
     # 表示用に、列を並べ替え
     PRDmsg = predict_data_yesterday[['No.', 'Name', 'Day', 'zone', 'zone_msg', 'nega_msg', 'comment']]
     PRDmsg = PRDmsg.rename(columns={'Day_x': 'Day', 'zone_msg': '成長ゾーン', 'nega_msg': 'Dailyアンケートコメント判定',
@@ -380,7 +378,7 @@ def insert_msg():
     pd.options.display.max_colwidth = 500  # 文章が途中で切れないようにするための設定
     PRDmsg = PRDmsg.fillna('No Data')
     return PRDmsg
-
+print(insert_msg())
 
 PRDmsg = insert_msg()
 
