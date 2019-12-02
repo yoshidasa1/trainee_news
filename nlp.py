@@ -16,7 +16,10 @@ import pandas as pd
 # import schedule
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
-import info_Z_2nd_2019
+from email.utils import make_msgid
+from email import message
+import smtplib
+import pj_info
 
 #google 認証などの手順があるため、今回は省略
 # SCOPES = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive',
@@ -75,36 +78,30 @@ def select_yesterday():
     yesterday['sentence'] = sentence
     yesterday['sentence_len'] = yesterday['sentence'].apply(len)
     return yesterday
-print(select_yesterday())
+# print(select_yesterday())
 # nlp.py:56: SettingWithCopyWarning:
 # A value is trying to be set on a copy of a slice from a DataFrame
+# C:\Flask\venv\lib\site-packages\sklearn\ensemble\forest.py:245:
+# FutureWarning: The default value of n_estimators will change from 10 in version 0.20 to 100 in 0.22.10 in version 0.20 to 100 in 0.22.", FutureWarning)
+
 
 #
 # 3_　文章分割
 def split_sent():
     yesterday = select_yesterday()
     # 3-3_データ結合
-    #リストの内包表記
-    #https: // docs.python.org / ja / 3 / tutorial / datastructures.html#list-comprehensions
+    # #リストの内包表記
+    # #https: // docs.python.org / ja / 3 / tutorial / datastructures.html#list-comprehensions
+    # 内包表記＆多重ループ
+    # https://www.lifewithpython.com/2014/09/python-list-comprehension-and-generator-expression-and-dict-comprehension.html
     trainee_number_list = [[yesterday['No.'][i]] * yesterday['sentence_len'][i] for i in range(len(yesterday))]
-    trainee_number_list = []  # No.リストの作成
-    for i in range(len(yesterday)):
-        tmp = [yesterday['No.'][i]] * yesterday['sentence_len'][i]
-        trainee_number_list.extend(tmp)
-    # day_list = [[yesterday['Day'][i]] * yesterday['sentence_len'][i] for i in range(len(yesterday))]
-    day_list = []  # DAYリストの作成
-    for i in range(len(yesterday)):
-        tmp = [yesterday['Day'][i]] * yesterday['sentence_len'][i]
-        day_list.extend(tmp)
-    # name_list = [[yesterday['Name'][i]] * yesterday['sentence_len'][i] for i in range(len(yesterday))]
-    name_list = []  # Nameリストの作成
-    for i in range(len(yesterday)):
-        tmp = [yesterday['Name'][i]] * yesterday['sentence_len'][i]
-        name_list.extend(tmp)
-    # sentence_list = [yesterday['sentence'][i] for i in range(len(yesterday))]
-    sentence_list = []  # 文リストの作成
-    for i in range(len(yesterday)):
-        sentence_list.extend(yesterday['sentence'][i])
+    trainee_number_list = [z for i in trainee_number_list for z in i]
+    day_list = [[yesterday['Day'][i]] * yesterday['sentence_len'][i] for i in range(len(yesterday))]
+    day_list = [z for i in day_list for z in i]
+    name_list = [[yesterday['Name'][i]] * yesterday['sentence_len'][i] for i in range(len(yesterday))]
+    name_list = [z for i in name_list for z in i]
+    sentence_list = [yesterday['sentence'][i] for i in range(len(yesterday))]
+    sentence_list = [z for i in sentence_list for z in i]
 
     sentence_data = pd.DataFrame({
         'No.': trainee_number_list,
@@ -158,7 +155,6 @@ def vec():
     train = sent2word()
     X = vectorizer.fit_transform(train["text_tokenized_normalized_number"])
     return X
-X = vec()
 # ＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝
 # ５_TFIDF計算
 vectorizert = TfidfVectorizer(token_pattern=r"(?u)\b\w+\b")
@@ -203,18 +199,13 @@ def labeled_data():
     return labeled
 
 
-labeled = labeled_data()
-
-
 def labeled_vec():
+    labeled = labeled_data()
     # 単語行列の作成
     X2 = vectorizer.fit_transform(labeled["text_tokenized_normalized_number"])
     # TFIDF計算
     X = vectorizert.fit_transform(labeled["text_tokenized_normalized_number"])
     return X
-
-
-X = labeled_vec()
 
 
 # 6-2_単語文章行列を学習済みデータ未知データでそれぞれ生成
@@ -224,17 +215,17 @@ def transform_vec():
     return X_test2
 
 
-X_test2 = transform_vec()
-
-
 # ＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝
 # ７_学習・予測
 # ８_予測データ表示
 # 8-1_ゾーン小さい順に並べ替え
 def predict_nlp_by_zone():
+    labeled = labeled_data()
     labeled_y = np.array(labeled['zone'])
     yesterday = select_yesterday()
     sentense_data = split_sent()
+    X = labeled_vec()
+    X_test2 = transform_vec()
     # 教師データで学習
     rfc = RandomForestClassifier(random_state=1234)
     rfc.fit(X, labeled_y)
@@ -263,10 +254,15 @@ def predict_nlp_by_zone():
 
 # 8-2_人別に並べ替え
 def predict_nlp_by_trainee():
+    labeled = labeled_data()
     labeled_y = np.array(labeled['zone'])
     yesterday = select_yesterday()
     sentense_data = split_sent()
-
+    X = labeled_vec()
+    X_test2 = transform_vec()
+    labeled_y = np.array(labeled['zone'])
+    yesterday = select_yesterday()
+    sentense_data = split_sent()
     # 教師データで学習
     rfc = RandomForestClassifier(random_state=1234)
     rfc.fit(X, labeled_y)
@@ -295,13 +291,9 @@ def predict_nlp_by_trainee():
     return predict_data_yesterday
 
 
-predict_data_yesterday = predict_nlp_by_zone()
-
-
-def insert_msg():
-    nega2all_msg = f"ネガティブな表現あり。"
-    nega2_msg = f"ネガティブな表現あり。"
-    nega2_ifnecessary = f"ネガティブな表現あり。"
+def PRD_msg():
+    nega2all_msg = f"ネガティブな表現あり。コメントを参照ください"
+    nega2_ifnecessary = f"ネガティブな表現あり。必要に応じてサポート"
     zone12nonnega_msg = f"ネガティブな表現はみられませんでしたが、成長が停滞している状態。"
     zone3nonnega_msg = f"ネガティブな表現はみられませんでしたが、成長が停滞している可能性。"
     zone4nonnega_msg = f"順調です。"
@@ -314,63 +306,58 @@ def insert_msg():
     distortion_msg = "ゾーン判定不可。行動と受講者認識にズレあり。"
     emptyPRD_msg = "Active度の記入をお願いします。"
     emptyTRA_msg = "Dailyアンケート未回答です。"
-    bar = "＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝"
 
-    # アパシーゾーンかつコメントネガあり/なし
-    def zone_judge(zone=None, zone_msg=None):
-        predict_data_yesterday.loc[zone, 'zone_msg'] = zone_msg
-    def nega_judge(zone=None, nega=None, nega_msg=None):
-        predict_data_yesterday.loc[zone & nega, 'nega_msg'] = nega_msg
+    # ゾーン判定、ネガ判定に沿って、コメント列を挿入
+    predict_data_yesterday = predict_nlp_by_zone()
+    def insert_msg(zone=None, nega=None):
+        if zone == 1:
+            predict_data_yesterday['zone_msg'][i] = zone1_msg
+            if nega > 1:
+                predict_data_yesterday['nega_msg'][i] = nega2all_msg
+            elif nega < 2:
+                predict_data_yesterday['nega_msg'][i] = zone12nonnega_msg
+        elif zone == 2:
+            predict_data_yesterday['zone_msg'][i] = zone2_msg
+            if nega > 1:
+                predict_data_yesterday['nega_msg'][i] = nega2all_msg
+            elif nega < 2:
+                predict_data_yesterday['nega_msg'][i] = zone12nonnega_msg
+        elif zone == 3:
+            predict_data_yesterday['zone_msg'][i] = zone3_msg
+            if nega > 1:
+                predict_data_yesterday['nega_msg'][i] = nega2all_msg
+            elif nega < 2:
+                predict_data_yesterday['nega_msg'][i] = zone3nonnega_msg
+        elif zone == 4:
+            predict_data_yesterday['zone_msg'][i] = zone4_msg
+            if nega > 1:
+                predict_data_yesterday['nega_msg'][i] = nega2_ifnecessary
+            elif nega < 2:
+                predict_data_yesterday['nega_msg'][i] = zone4nonnega_msg
+        elif zone == 5:
+            predict_data_yesterday['zone_msg'][i] = zone5_msg
+            if nega > 1:
+                predict_data_yesterday['nega_msg'][i] = nega2_ifnecessary
+            elif nega < 2:
+                predict_data_yesterday['nega_msg'][i] = zone4nonnega_msg
+        elif zone == 0:
+            predict_data_yesterday['zone_msg'][i] = distortion_msg
+            if nega > 1:
+                predict_data_yesterday['nega_msg'][i] = nega2_ifnecessary
+            elif nega < 2:
+                predict_data_yesterday['nega_msg'][i] = zone4nonnega_msg
+        elif zone == -1:
+            predict_data_yesterday['zone_msg'][i] = emptyPRD_msg
+            if nega > 1:
+                predict_data_yesterday['nega_msg'][i] = nega2_ifnecessary
+            elif nega < 2:
+                predict_data_yesterday['nega_msg'][i] = zone4nonnega_msg
+        elif zone == -2:
+            predict_data_yesterday['zone_msg'][i] = emptyTRA_msg
 
-    zone_judge(zone = predict_data_yesterday['zone'] == 1, zone_msg = zone1_msg)
-    nega_judge(
-        zone=(predict_data_yesterday['zone'] == 1), nega=(predict_data_yesterday['nega_predict'] > 1), nega_msg = nega2all_msg)
-    nega_judge(
-        zone=(predict_data_yesterday['zone'] == 1), nega=(predict_data_yesterday['nega_predict'] < 2), nega_msg = zone12nonnega_msg)
-#     predict_data_yesterday.loc[predict_data_yesterday['zone'] == 1, 'zone_msg'] = zone1_msg
-#     predict_data_yesterday.loc[
-#         (predict_data_yesterday['zone'] == 1) & (predict_data_yesterday['nega_predict'] > 1), 'nega_msg'] = nega2all_msg
-#     predict_data_yesterday.loc[(predict_data_yesterday['zone'] == 1) & (
-#             predict_data_yesterday['nega_predict'] < 2), 'nega_msg'] = zone12nonnega_msg
-#     # パニックゾーンかつコメントネガあり・なし
-#     predict_data_yesterday.loc[predict_data_yesterday['zone'] == 2, 'zone_msg'] = zone2_msg
-#     predict_data_yesterday.loc[
-#         (predict_data_yesterday['zone'] == 2) & (predict_data_yesterday['nega_predict'] > 1), 'nega_msg'] = nega2all_msg
-#     predict_data_yesterday.loc[(predict_data_yesterday['zone'] == 2) & (
-#             predict_data_yesterday['nega_predict'] < 2), 'nega_msg'] = zone12nonnega_msg
-#     # コンフォートゾーンかつコメントネガあり・なし
-#     predict_data_yesterday.loc[predict_data_yesterday['zone'] == 3, 'zone_msg'] = zone3_msg
-#     predict_data_yesterday.loc[
-#         (predict_data_yesterday['zone'] == 3) & (predict_data_yesterday['nega_predict'] > 1), 'nega_msg'] = nega2all_msg
-#     predict_data_yesterday.loc[(predict_data_yesterday['zone'] == 3) & (
-#             predict_data_yesterday['nega_predict'] < 2), 'nega_msg'] = zone3nonnega_msg
-#     # スクワットゾーンかつコメントネガあり・なし
-#     predict_data_yesterday.loc[predict_data_yesterday['zone'] == 4, 'zone_msg'] = zone4_msg
-#     predict_data_yesterday.loc[(predict_data_yesterday['zone'] == 4) & (
-#             predict_data_yesterday['nega_predict'] > 1), 'nega_msg'] = nega2_ifnecessary
-#     predict_data_yesterday.loc[(predict_data_yesterday['zone'] == 4) & (
-#             predict_data_yesterday['nega_predict'] < 2), 'nega_msg'] = zone4nonnega_msg
-#     # パフォーマンスゾーン以上かつコメントネガあり・なし
-#     predict_data_yesterday.loc[predict_data_yesterday['zone'] > 4, 'zone_msg'] = zone5_msg
-#     predict_data_yesterday.loc[(predict_data_yesterday['zone'] > 4) & (
-#             predict_data_yesterday['nega_predict'] > 1), 'nega_msg'] = nega2_ifnecessary
-#     predict_data_yesterday.loc[(predict_data_yesterday['zone'] > 4) & (
-#             predict_data_yesterday['nega_predict'] < 2), 'nega_msg'] = zone4nonnega_msg
-#     # ちぐはぐ、かつコメントネガあり
-#     predict_data_yesterday.loc[predict_data_yesterday['zone'] == 0, 'zone_msg'] = distortion_msg
-#     predict_data_yesterday.loc[(predict_data_yesterday['zone'] == 0) & (
-#             predict_data_yesterday['nega_predict'] > 1), 'nega_msg'] = nega2_ifnecessary
-#     predict_data_yesterday.loc[(predict_data_yesterday['zone'] == 0) & (
-#             predict_data_yesterday['nega_predict'] < 2), 'nega_msg'] = zone4nonnega_msg
-#     # PRD未記入、かつコメントネガあり
-#     predict_data_yesterday.loc[predict_data_yesterday['zone'] == -1, 'zone_msg'] = emptyPRD_msg
-#     predict_data_yesterday.loc[(predict_data_yesterday['zone'] == -1) & (
-#             predict_data_yesterday['nega_predict'] > 1), 'nega_msg'] = nega2_ifnecessary
-#     predict_data_yesterday.loc[(predict_data_yesterday['zone'] == 1) & (
-#             predict_data_yesterday['nega_predict'] < 2), 'nega_msg'] = zone4nonnega_msg
-#     # 受講者未回答
-#     predict_data_yesterday.loc[predict_data_yesterday['zone'] == -2, 'zone_msg'] = emptyTRA_msg
-#
+    for i in range(len(predict_data_yesterday)):
+        insert_msg(zone=predict_data_yesterday['zone'][i], nega=predict_data_yesterday['nega_predict'][i])
+
     # 表示用に、列を並べ替え
     PRDmsg = predict_data_yesterday[['No.', 'Name', 'Day', 'zone', 'zone_msg', 'nega_msg', 'comment']]
     PRDmsg = PRDmsg.rename(columns={'Day_x': 'Day', 'zone_msg': '成長ゾーン', 'nega_msg': 'Dailyアンケートコメント判定',
@@ -378,42 +365,40 @@ def insert_msg():
     pd.options.display.max_colwidth = 500  # 文章が途中で切れないようにするための設定
     PRDmsg = PRDmsg.fillna('No Data')
     return PRDmsg
-print(insert_msg())
+# print(PRD_msg())
+#KeyError: 'zone_msg'
+# File "C:\Flask\nlp.py", line 324, in insert_msg
+#   predict_data_yesterday['zone_msg'][i] = zone3_msg
 
-PRDmsg = insert_msg()
 
+def mail_msg():
+    PRDmsg = PRD_msg()
+    mail_head = f"<p>{pj_info.COMPANY}_{pj_info.BATCH}_講師の皆様</p>\
+    <p>おはようございます。昨日の受講者の状態をお伝えします。</p><p>Dailyアンケート:" + pj_info.DR_URL + "</p>"
+    mail_end = "<p></p>以上"
+    html_sheet = PRDmsg.to_html()
+    html = mail_head + html_sheet + mail_end
+    return html
+# print(mail_msg())
 
-# def mail_msg():
-#     mail_head = f"<p>{COMPANY}_{BATCH}_講師の皆様</p>\
-#     <p>おはようございます。昨日の受講者の状態をお伝えします。</p><p>Dailyアンケート:" + DR_URL + "</p>"
-#     mail_end = "<p></p>以上"
-#     html_sheet = PRDmsg.to_html()
-#     html = mail_head + html_sheet + mail_end
-#     return html
-#
-#
-# html = mail_msg()
-#
 #
 # def gmail_send():
-#     from email.utils import make_msgid
-#     from email import message
-#     import smtplib
-#
 #     smtp_host = 'smtp.gmail.com'
 #     smtp_port = 587
-#     from_email = ''
-#     username = ''  # Gmailのアドレス
+#     from_email = 'admin@alue-training.com'
+#     username = 'admin@alue-training.com'  # Gmailのアドレス
 #     password = ''  # Gmailのパスワード
 #
 #     # メールの内容を作成
 #     msg = message.EmailMessage()
+#     html = mail_msg()
+#     PRDmsg = PRD_msg()
 #     msg.set_content(html)  # メールの本文
 #     yesterday = PRDmsg['Day'][1]
-#     msg['Subject'] = f"【{yesterday}】{COMPANY}_{BATCH}Trainee news"  # 件名
+#     msg['Subject'] = f"【{yesterday}】{pj_info.COMPANY}_{pj_info.BATCH}Trainee news"  # 件名
 #     msg['From'] = from_email  # メール送信元
-#     msg['To'] = to_email  # メール送信先
-#     msg['Cc'] = cc_email
+#     msg['To'] = pj_info.to_email  # メール送信先
+#     msg['Cc'] = pj_info.cc_email
 #
 #     asparagus_cid = make_msgid()
 #     msg.add_alternative(html.format(asparagus_cid=asparagus_cid[1:-1]), subtype='html')
@@ -425,11 +410,11 @@ PRDmsg = insert_msg()
 #     server.ehlo()
 #     server.login(username, password)
 #     # server.send_message(msg)
-#     toaddrs = [to_email] + [cc_email]
+#     toaddrs = [pj_info.to_email] + [pj_info.cc_email]
 #     server.sendmail(from_email, toaddrs, msg.as_string())
 #     server.quit()
-#
-#
+# gmail_send()
+
 # # 送信予約する場合
 # def notice_PRD():
 #     schedule.every().day.at("10:00").do(gmail_send)
