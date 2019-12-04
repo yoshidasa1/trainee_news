@@ -290,14 +290,12 @@ def predict_nlp_by_trainee():
     predict_data_yesterday = predict_data_yesterday.sort_values(by=['No.', 'Day'])  # 人別に並べ替え
     return predict_data_yesterday
 
-
-def PRD_msg():
+def insert_msg(predict_data_yesterday):
     nega2all_msg = f"ネガティブな表現あり。コメントを参照ください"
     nega2_ifnecessary = f"ネガティブな表現あり。必要に応じてサポート"
     zone12nonnega_msg = f"ネガティブな表現はみられませんでしたが、成長が停滞している状態。"
     zone3nonnega_msg = f"ネガティブな表現はみられませんでしたが、成長が停滞している可能性。"
     zone4nonnega_msg = f"順調です。"
-
     zone1_msg = "アパシーゾーン（無気力）。即時サポートを推奨。"
     zone2_msg = "パニックゾーンの可能性。即時サポートを推奨。"
     zone3_msg = "コンフォートゾーンの可能性。"
@@ -306,58 +304,61 @@ def PRD_msg():
     distortion_msg = "ゾーン判定不可。行動と受講者認識にズレあり。"
     emptyPRD_msg = "Active度の記入をお願いします。"
     emptyTRA_msg = "Dailyアンケート未回答です。"
+    for j in range(len(predict_data_yesterday)):
+        predict_data_yesterday['zone_msg']=""
+        predict_data_yesterday['nega_msg']=""
+    for i in range(len(predict_data_yesterday)):
+        if predict_data_yesterday['zone'][i] == 1:
+            predict_data_yesterday['zone_msg'][i] = zone1_msg
+            if predict_data_yesterday['nega_predict'][i] > 1:
+                predict_data_yesterday['nega_msg'][i] = nega2all_msg
+            elif predict_data_yesterday['nega_predict'][i] < 2:
+                predict_data_yesterday['nega_msg'][i] = zone12nonnega_msg
+        elif predict_data_yesterday['zone'][i] == 2:
+            predict_data_yesterday['zone_msg'][i] = zone2_msg
+            if predict_data_yesterday['nega_predict'][i] > 1:
+                predict_data_yesterday['nega_msg'][i] = nega2all_msg
+            elif predict_data_yesterday['nega_predict'][i] < 2:
+                predict_data_yesterday['nega_msg'][i] = zone12nonnega_msg
+        elif predict_data_yesterday['zone'][i] == 3:
+            predict_data_yesterday['zone_msg'][i] = zone3_msg
+            if predict_data_yesterday['nega_predict'][i] > 1:
+                predict_data_yesterday['nega_msg'][i] = nega2all_msg
+            elif predict_data_yesterday['nega_predict'][i] < 2:
+                predict_data_yesterday['nega_msg'][i] = zone3nonnega_msg
+        elif predict_data_yesterday['zone'][i] == 4:
+            predict_data_yesterday['zone_msg'][i] = zone4_msg
+            if predict_data_yesterday['nega_predict'][i] > 1:
+                predict_data_yesterday['nega_msg'][i] = nega2_ifnecessary
+            elif predict_data_yesterday['nega_predict'][i] < 2:
+                predict_data_yesterday['nega_msg'][i] = zone4nonnega_msg
+        elif predict_data_yesterday['zone'][i] > 4:
+            predict_data_yesterday['zone_msg'][i] = zone5_msg
+            if predict_data_yesterday['nega_predict'][i] > 1:
+                predict_data_yesterday['nega_msg'][i] = nega2_ifnecessary
+            elif predict_data_yesterday['nega_predict'][i] < 2:
+                predict_data_yesterday['nega_msg'][i] = zone4nonnega_msg
+        elif predict_data_yesterday['zone'][i] == 0:
+            predict_data_yesterday['zone_msg'][i] = distortion_msg
+            if predict_data_yesterday['nega_predict'][i] > 1:
+                predict_data_yesterday['nega_msg'][i] = nega2_ifnecessary
+            elif predict_data_yesterday['nega_predict'][i] < 2:
+                predict_data_yesterday['nega_msg'][i] = zone4nonnega_msg
+        elif predict_data_yesterday['zone'][i] == -1:
+            predict_data_yesterday['zone_msg'][i] = emptyPRD_msg
+            if predict_data_yesterday['nega_predict'][i] > 1:
+                predict_data_yesterday['nega_msg'][i] = nega2_ifnecessary
+            elif predict_data_yesterday['nega_predict'][i] < 2:
+                predict_data_yesterday['nega_msg'][i] = zone4nonnega_msg
+        elif predict_data_yesterday['zone'][i] == -2:
+            predict_data_yesterday['zone_msg'][i] = emptyTRA_msg
+    return predict_data_yesterday
 
+
+def PRD_msg():
     # ゾーン判定、ネガ判定に沿って、コメント列を挿入
     predict_data_yesterday = predict_nlp_by_zone()
-    def insert_msg(zone=None, nega=None):
-        if zone == 1:
-            predict_data_yesterday['zone_msg'][i] = zone1_msg
-            if nega > 1:
-                predict_data_yesterday['nega_msg'][i] = nega2all_msg
-            elif nega < 2:
-                predict_data_yesterday['nega_msg'][i] = zone12nonnega_msg
-        elif zone == 2:
-            predict_data_yesterday['zone_msg'][i] = zone2_msg
-            if nega > 1:
-                predict_data_yesterday['nega_msg'][i] = nega2all_msg
-            elif nega < 2:
-                predict_data_yesterday['nega_msg'][i] = zone12nonnega_msg
-        elif zone == 3:
-            predict_data_yesterday['zone_msg'][i] = zone3_msg
-            if nega > 1:
-                predict_data_yesterday['nega_msg'][i] = nega2all_msg
-            elif nega < 2:
-                predict_data_yesterday['nega_msg'][i] = zone3nonnega_msg
-        elif zone == 4:
-            predict_data_yesterday['zone_msg'][i] = zone4_msg
-            if nega > 1:
-                predict_data_yesterday['nega_msg'][i] = nega2_ifnecessary
-            elif nega < 2:
-                predict_data_yesterday['nega_msg'][i] = zone4nonnega_msg
-        elif zone == 5:
-            predict_data_yesterday['zone_msg'][i] = zone5_msg
-            if nega > 1:
-                predict_data_yesterday['nega_msg'][i] = nega2_ifnecessary
-            elif nega < 2:
-                predict_data_yesterday['nega_msg'][i] = zone4nonnega_msg
-        elif zone == 0:
-            predict_data_yesterday['zone_msg'][i] = distortion_msg
-            if nega > 1:
-                predict_data_yesterday['nega_msg'][i] = nega2_ifnecessary
-            elif nega < 2:
-                predict_data_yesterday['nega_msg'][i] = zone4nonnega_msg
-        elif zone == -1:
-            predict_data_yesterday['zone_msg'][i] = emptyPRD_msg
-            if nega > 1:
-                predict_data_yesterday['nega_msg'][i] = nega2_ifnecessary
-            elif nega < 2:
-                predict_data_yesterday['nega_msg'][i] = zone4nonnega_msg
-        elif zone == -2:
-            predict_data_yesterday['zone_msg'][i] = emptyTRA_msg
-
-    for i in range(len(predict_data_yesterday)):
-        insert_msg(zone=predict_data_yesterday['zone'][i], nega=predict_data_yesterday['nega_predict'][i])
-
+    predict_data_yesterday = insert_msg(predict_data_yesterday)
     # 表示用に、列を並べ替え
     PRDmsg = predict_data_yesterday[['No.', 'Name', 'Day', 'zone', 'zone_msg', 'nega_msg', 'comment']]
     PRDmsg = PRDmsg.rename(columns={'Day_x': 'Day', 'zone_msg': '成長ゾーン', 'nega_msg': 'Dailyアンケートコメント判定',

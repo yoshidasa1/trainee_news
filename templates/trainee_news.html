@@ -1,39 +1,34 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
-    <meta charset="UTF-8">
-    <title>Trainee news</title>
-</head>
-<body>
+{% extends 'base.html' %}
+
+{% block body %}
     <h1>Trainee news</h1>
     <table class="table table-bordered">
       <thead class="thead-light">
       <tr>
         <th scope="col"> No.</th>
         <th scope="col">name</th>
+          <th scope="col">Day</th>
         <th scope="col">zone</th>
-        <th scope="col">講師レコメンド</th>
-        <th scope="col">受講者コメント引用</th>
+        <th scope="col">成長ゾーン</th>
+        <th scope="col">Dailyアンケートコメント判定</th>
+          <th scope="col">Dailyアンケートコメント引用</th>
         <th></th>
       </tr>
       </thead>
       <tbody>
+      {% for i in result %}
       <tr>
-        <th scope="row">1</th>
-        <td>AA</td>
-        <td>3</td>
-        <td>コンフォートゾーンです</td>
-        <td></td>
-        <td><a href="/fb"><button type="button" class="btn btn-success"  class="mx-auto">正誤入力</button></a></td>
+          <td>{{ i[0] }}</td>
+          <td>{{ i[1] }}</td>
+          <td>{{ i[2] }}</td>
+          <td>{{ i[3] }}</td>
+          <td>{{ i[4] }}</td>
+          <td>{{ i[5] }}</td>
+          <td>{{ i[6] }}</td>
+          <td><a href="/fb"><button type="button" class="btn btn-success"  class="mx-auto">正誤入力</button></a></td>
       </tr>
       </tbody>
+      {% endfor %}
     </table>
-    <h2>
-        <p>
-            {{ result }}
-        </p>
-    </h2>
     <a href="/">閉じる</a>
-</body>
-</html>
+{% endblock %}

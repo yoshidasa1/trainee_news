@@ -22,6 +22,7 @@ def trainee_news():
         nlp.transform_vec()
         nlp.predict_nlp_by_zone()
         result=nlp.PRD_msg()
+        result=result.values.tolist()
         # result = nlp.mail_msg()
         return render_template("trainee_news.html", result=result)
     else:
