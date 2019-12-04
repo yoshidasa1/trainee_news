@@ -1,9 +1,3 @@
-# NLP（自然言語処理）の処理。これをtrainee_news.pyでimportして実行できないかと考えています
-
-# pycharmでのパッケージのインストールが、一部、うまく検索で見つけられなかったものがありました。pickleやreなど→pip
-# 機械学習前の前処理の途中で、書きかけですが、コードの書き方や関数の動かし方など、アドバイスいただければ嬉しいです
-
-# !pip install pickle
 import pickle
 import re
 import time
@@ -58,7 +52,8 @@ def select_yesterday():
         data = pd.read_table(file, delimiter=',', na_filter=False)
     drop_cols = ['sheet', 'sheetkey']
     data = data.drop(drop_cols, axis=1)
-    data.comment[data.comment == ''] = 'NoData'
+    # data.comment[data.comment == ''] = 'NoData'
+    data.comment[data.loc[:,'comment'] == ''] = 'NoData'
     kako = data[data['comment'] != 'NoData'].max()
     recent = kako['Day']
     yesterday = data[data['Day'] == recent]
@@ -81,9 +76,6 @@ def select_yesterday():
 # print(select_yesterday())
 # nlp.py:56: SettingWithCopyWarning:
 # A value is trying to be set on a copy of a slice from a DataFrame
-# C:\Flask\venv\lib\site-packages\sklearn\ensemble\forest.py:245:
-# FutureWarning: The default value of n_estimators will change from 10 in version 0.20 to 100 in 0.22.10 in version 0.20 to 100 in 0.22.", FutureWarning)
-
 
 #
 # 3_　文章分割
@@ -367,9 +359,6 @@ def PRD_msg():
     PRDmsg = PRDmsg.fillna('No Data')
     return PRDmsg
 # print(PRD_msg())
-#KeyError: 'zone_msg'
-# File "C:\Flask\nlp.py", line 324, in insert_msg
-#   predict_data_yesterday['zone_msg'][i] = zone3_msg
 
 
 def mail_msg():
@@ -427,5 +416,5 @@ def mail_msg():
 # notice_PRD()
 #
 #
-# if __name__ == '__main__':
-#     main()
+if __name__ == '__main__':
+    select_yesterday()
