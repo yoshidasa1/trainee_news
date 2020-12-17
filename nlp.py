@@ -15,7 +15,7 @@ from email import message
 import smtplib
 import pj_info
 
-#google 認証などの手順があるため、今回は省略
+#DBはgoogleドライブで代用していたため、google 認証などの手順があるが、省略
 # SCOPES = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive',
 #           'https://www.googleapis.com/auth/drive.file']
 # # スプレッドシート読み込み
@@ -73,19 +73,12 @@ def select_yesterday():
     yesterday['sentence'] = sentence
     yesterday['sentence_len'] = yesterday['sentence'].apply(len)
     return yesterday
-# print(select_yesterday())
-# nlp.py:56: SettingWithCopyWarning:
-# A value is trying to be set on a copy of a slice from a DataFrame
 
 #
 # 3_　文章分割
 def split_sent():
     yesterday = select_yesterday()
     # 3-3_データ結合
-    # #リストの内包表記
-    # #https: // docs.python.org / ja / 3 / tutorial / datastructures.html#list-comprehensions
-    # 内包表記＆多重ループ
-    # https://www.lifewithpython.com/2014/09/python-list-comprehension-and-generator-expression-and-dict-comprehension.html
     trainee_number_list = [[yesterday['No.'][i]] * yesterday['sentence_len'][i] for i in range(len(yesterday))]
     trainee_number_list = [z for i in trainee_number_list for z in i]
     day_list = [[yesterday['Day'][i]] * yesterday['sentence_len'][i] for i in range(len(yesterday))]
@@ -105,7 +98,6 @@ def split_sent():
     bool_list = sentence_data["sentence_list"] == ""
     sentense_data = sentence_data[~bool_list]
     return sentense_data
-# print(split_sent())
 
 
 # ３_単語分割
@@ -358,7 +350,6 @@ def PRD_msg():
     pd.options.display.max_colwidth = 500  # 文章が途中で切れないようにするための設定
     PRDmsg = PRDmsg.fillna('No Data')
     return PRDmsg
-# print(PRD_msg())
 
 
 def mail_msg():
@@ -369,52 +360,51 @@ def mail_msg():
     html_sheet = PRDmsg.to_html()
     html = mail_head + html_sheet + mail_end
     return html
-# print(mail_msg())
 
-#
-# def gmail_send():
-#     smtp_host = 'smtp.gmail.com'
-#     smtp_port = 587
-#     from_email = 'admin@alue-training.com'
-#     username = 'admin@alue-training.com'  # Gmailのアドレス
-#     password = ''  # Gmailのパスワード
-#
-#     # メールの内容を作成
-#     msg = message.EmailMessage()
-#     html = mail_msg()
-#     PRDmsg = PRD_msg()
-#     msg.set_content(html)  # メールの本文
-#     yesterday = PRDmsg['Day'][1]
-#     msg['Subject'] = f"【{yesterday}】{pj_info.COMPANY}_{pj_info.BATCH}Trainee news"  # 件名
-#     msg['From'] = from_email  # メール送信元
-#     msg['To'] = pj_info.to_email  # メール送信先
-#     msg['Cc'] = pj_info.cc_email
-#
-#     asparagus_cid = make_msgid()
-#     msg.add_alternative(html.format(asparagus_cid=asparagus_cid[1:-1]), subtype='html')
-#
-#     # メールサーバーへアクセス
-#     server = smtplib.SMTP(smtp_host, smtp_port)
-#     server.ehlo()
-#     server.starttls()
-#     server.ehlo()
-#     server.login(username, password)
-#     # server.send_message(msg)
-#     toaddrs = [pj_info.to_email] + [pj_info.cc_email]
-#     server.sendmail(from_email, toaddrs, msg.as_string())
-#     server.quit()
-# gmail_send()
 
-# # 送信予約する場合
-# def notice_PRD():
-#     schedule.every().day.at("10:00").do(gmail_send)
-#     while True:
-#         schedule.run_pending()
-#         time.sleep(1)
-#
-#
-# notice_PRD()
-#
-#
+def gmail_send():
+    smtp_host = 'smtp.gmail.com'
+    smtp_port = 587
+    from_email = ''
+    username = ''  # mailのアドレス
+    password = ''  # mailのパスワード
+
+    # メールの内容を作成
+    msg = message.EmailMessage()
+    html = mail_msg()
+    PRDmsg = PRD_msg()
+    msg.set_content(html)  # メールの本文
+    yesterday = PRDmsg['Day'][1]
+    msg['Subject'] = f"【{yesterday}】{pj_info.COMPANY}_{pj_info.BATCH}Trainee news"  # 件名
+    msg['From'] = from_email  # メール送信元
+    msg['To'] = pj_info.to_email  # メール送信先
+    msg['Cc'] = pj_info.cc_email
+
+    asparagus_cid = make_msgid()
+    msg.add_alternative(html.format(asparagus_cid=asparagus_cid[1:-1]), subtype='html')
+
+    # メールサーバーへアクセス
+    server = smtplib.SMTP(smtp_host, smtp_port)
+    server.ehlo()
+    server.starttls()
+    server.ehlo()
+    server.login(username, password)
+    # server.send_message(msg)
+    toaddrs = [pj_info.to_email] + [pj_info.cc_email]
+    server.sendmail(from_email, toaddrs, msg.as_string())
+    server.quit()
+gmail_send()
+
+# 送信予約する場合
+def notice_PRD():
+    schedule.every().day.at("10:00").do(gmail_send)
+    while True:
+        schedule.run_pending()
+        time.sleep(1)
+
+
+notice_PRD()
+
+
 if __name__ == '__main__':
     select_yesterday()
